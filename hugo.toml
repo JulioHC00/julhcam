@@ -1,4 +1,4 @@
-baseURL = 'https://julhcam.com/'
+baseURL = 'https://julhcam.eu/'
 locale = 'en-gb'
 title = 'JulHCam'
 theme = "archie"
