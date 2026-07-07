@@ -6,11 +6,20 @@ copyright = "© JulhCam"
 
 # Colour palette https://coolors.co/7b2525-ba6a4c-fbfbee-bbd686-607456
 
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.extensions]
+      [markup.goldmark.extensions.passthrough]
+        enable = true
+        [markup.goldmark.extensions.passthrough.delimiters]
+          block = [['\[', '\]'], ['$$', '$$']]
+          inline = [['$', '$'], ['\(', '\)']]
+
 [params]
-	mode="toggle" # color-mode → light,dark,toggle or auto
+    mode="toggle" # color-mode → light,dark,toggle or auto
     useCDN=false
     mathjax = true # enable MathJax support
-    katex = true # enable KaTeX support
+    katex = false # enable KaTeX support
 
 [[menu.main]]
 name = "Posts"
@@ -41,3 +50,4 @@ weight = 5
 name = "Github"
 icon = "github"
 url = "https://github.com/juliohc00/julhcam"
+
