@@ -3,6 +3,7 @@ locale = 'en-gb'
 title = 'JulHCam'
 theme = "archie"
 copyright = "© JulhCam"
+enableRobotsTXT = true
 
 # Colour palette https://coolors.co/7b2525-ba6a4c-fbfbee-bbd686-607456
 
