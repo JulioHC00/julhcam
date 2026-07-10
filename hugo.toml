@@ -4,6 +4,7 @@ title = 'JulHCam'
 theme = "archie"
 copyright = "© JulhCam"
 enableRobotsTXT = true
+enableGitInfo = true
 
 # Colour palette https://coolors.co/7b2525-ba6a4c-fbfbee-bbd686-607456
 
@@ -25,10 +26,10 @@ enableRobotsTXT = true
 [[menu.main]]
 name = "Posts"
 url = "/posts"
-weight = 2
+weight = 1
 
 [[menu.main]]
-name = "Publications"
+name = "Papers"
 url = "/publications"
 weight = 2.5
 
@@ -46,6 +47,11 @@ weight = 4
 name = "Search"
 url = "/search"
 weight = 5
+
+[[params.social]]
+name = "email"
+icon = "mail"
+url = "mailto:contact@julhcam.eu"
 
 [[params.social]]
 name = "Github"
