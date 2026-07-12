@@ -22,6 +22,15 @@ enableGitInfo = true
     useCDN=true
     mathjax = true # enable MathJax support
     katex = false # enable KaTeX support
+  [params.author]
+    email = 'contact@julhcam.eu'
+    name = 'JulHCam'
+
+[outputs]
+  home = ["html","rss"]
+  section = ["html"]
+  taxonomy = ["html"]
+  term = ["html"]
 
 [[menu.main]]
 name = "Posts"
@@ -57,4 +66,9 @@ url = "mailto:contact@julhcam.eu"
 name = "Github"
 icon = "github"
 url = "https://github.com/juliohc00/julhcam"
+
+[[params.social]]
+name = "RSS"
+icon = "rss"
+url = "/index.xml"
 
