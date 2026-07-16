@@ -22,7 +22,7 @@ enableGitInfo = true
     useCDN=true
     mathjax = true # enable MathJax support
     katex = false # enable KaTeX support
-    customcss = ["css/d3js.css"]
+    customcss = ["css/d3js.css", "css/mathjax.css"]
   [params.author]
     email = 'contact@julhcam.eu'
     name = 'JulHCam'
