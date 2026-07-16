@@ -1,0 +1,56 @@
+.d3-chart body {
+    padding: 20px;
+}
+.d3-chart .control-group {
+    margin-bottom: 0.5rem;
+}
+
+.d3-chart label {
+    display: inline-block;
+    width: 30%;
+    font-weight: bold;
+}
+
+.d3-chart .value-label {
+    display: inline-block;
+    width: auto; 
+    text-align: left;
+}
+.d3-chart .domain, .tick line {
+    stroke: #ccc;
+}
+.d3-chart .tick text {
+    fill: #666; font-size: 16px; 
+}
+.d3-chart .axis-label {
+    font-size: 18px; font-weight: bold; fill: #333;
+}
+.d3-chart input[type="range"] {
+    width: 40%;
+}
+.d3-chart input{
+    margin-right: auto;
+}
+.d3-chart .line-blue {
+    fill: none; stroke: #39909E; stroke-width: 3px;
+}
+.d3-chart .area-blue {
+    fill: #39909E; opacity: 0.2;
+}
+
+.d3-chart select, ::picker(select) {
+  appearance: base-select;
+}
+
+.d3-chart select {
+  border: 2px solid var(--color-primary);
+  background: var(--color-background-select);
+  padding: 5px;
+}
+
+.d3-chart ::picker(select) {
+    background: var(--color-background-select);
+    border-radius: 5px;
+    border: 2px solid var(--color-primary);
+    padding: 5px;
+}

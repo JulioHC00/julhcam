@@ -1,0 +1,450 @@
+<div class="d3-chart">
+    <div class="control-group">
+        <label for="freqdev-demod">
+            Frequency deviation:
+        </label>
+        <input id="freqdev-demod" type="range" min="50" max="100" step="1" value="100">
+        <span class="value-label" id="freqdev-value-demod">100</span> Hz
+    </div>
+    <div class="control-group">
+        <label for="noise">
+            Noise:
+        </label>
+        <input id="noise" type="range" min="0" max="0.003" step="0.001" value="0">
+        <span class="value-label" id="noise-value">0</span>
+    </div>
+    <div class="control-group">
+        <label for="interference">
+            Interference:
+        </label>
+        <input id="interference" type="range" min="0" max="0.4" step="0.01" value="0">
+        <span class="value-label" id="interference-value">0</span>
+    </div>
+    <div class="control-group">
+        <label for="interference-freq">
+            Interference Freq:
+        </label>
+        <input id="interference-freq" type="range" min="100" max="1000" step="10" value="250">
+        <span class="value-label" id="interference-freq-value">250</span> Hz
+        </label>
+    </div>
+    <div class="control-group">
+        <label for="filter-band-toggle">
+            FM band-pass Filter:
+        </label>
+        <input id="filter-band-toggle" type="checkbox" unchecked>
+        <span class="value-label" id="filter-band-value">Off</span>
+    </div>
+    <div class="control-group">
+        <label for="filter-toggle">
+            Audio low-pass Filter:
+        </label>
+        <input id="filter-toggle" type="checkbox" unchecked>
+        <span class="value-label" id="filter-value">Off</span>
+    </div>
+
+    <div id="fm-demod-plot"></div>
+</div>
+
+<script type="module">
+
+    import fftJs from 'https://cdn.jsdelivr.net/npm/fft.js@4.0.4/+esm'
+
+    const widthd = 900;
+    const heightd = 650;
+
+    const svgd = d3.select("#fm-demod-plot")
+        .append("svg")
+        .attr("viewBox", `0 0 ${widthd} ${heightd}`)
+        .style("height", "auto")
+        .style("display", "block");
+
+    const N = 2048 * 2;
+    const duration = 0.1;
+    const fs = N / duration;
+
+    const signalFreq = 20;
+    const noiseFreq = 25;
+    const carrierFreq = 200;
+
+
+    const t = d3.range(N).map(i => i / fs);
+
+    const x = d3.scaleLinear()
+        .domain([0, duration])
+        .range([180, widthd - 40]);
+
+    const message = t.map(time =>
+    ((
+        Math.sin(2 * Math.PI * signalFreq * time)
+        + Math.sin(2 * Math.PI * 1.5 * signalFreq * time + Math.PI)
+    ) / 2)
+    );
+
+    const messageInterference = t.map(time =>
+    ((
+        Math.sin(2 * Math.PI * signalFreq * time / 2)
+        + Math.sin(2 * Math.PI * 1.5 * signalFreq * time + Math.PI / 2)
+    ) / 2)
+    );
+
+    const bandsd = {
+        fm: 120,
+        hilbert: 300,
+        demod: 480,
+    };
+
+    const amplitude = 70;
+
+    const colorsd = {
+        fm: "#39909E",
+        hilbert: "#64748b",
+        demod: "#EBB53D",
+        original: "#ddd",
+        noisyFM: "#ddd",
+    };
+
+    Object.values(bandsd).forEach(y => {
+        svgd.append("line")
+            .attr("x1", 180)
+            .attr("x2", widthd - 40)
+            .attr("y1", y)
+            .attr("y2", y)
+            .attr("stroke", "#ddd");
+    });
+
+    const fmdNoisyPath = svgd.append("path")
+        .attr("fill", "none")
+        .attr("stroke", colorsd.noisyFM)
+        .attr("stroke-width", 3.5);
+
+    const fmdPath = svgd.append("path")
+        .attr("fill", "none")
+        .attr("stroke", colorsd.fm)
+        .attr("stroke-width", 3.5);
+
+    const hilbertPath = svgd.append("path")
+        .attr("fill", "none")
+        .attr("stroke", colorsd.hilbert)
+        .attr("stroke-width", 3.5);
+
+
+    const originalPath = svgd.append("path")
+        .attr("fill", "none")
+        .attr("stroke", colorsd.original)
+        .attr("stroke-width", 3.5);
+
+    const demodPath = svgd.append("path")
+        .attr("fill", "none")
+        .attr("stroke", colorsd.demod)
+        .attr("stroke-width", 3.5);
+
+    originalPath.attr("d",
+        makeWavePath(
+            t.map((time, i) => ({ t: time, y: -message[i] })),
+            bandsd.demod
+        )
+    );
+
+    svgd.append("text")
+        .attr("x", 10)
+        .attr("y", bandsd.fm)
+        .text("FM Signal")
+        .attr("fill", colorsd.fm)
+        .style("font-size", "20px")
+        .style("font-weight", "700");
+
+    svgd.append("text")
+        .attr("x", 10)
+        .attr("y", bandsd.hilbert)
+        .text("Hilbert (Q)")
+        .attr("fill", colorsd.hilbert)
+        .style("font-size", "20px")
+        .style("font-weight", "700");
+
+    svgd.append("text")
+        .attr("x", 10)
+        .attr("y", bandsd.demod)
+        .text("Demodulated")
+        .attr("fill", colorsd.demod)
+        .style("font-size", "20px")
+        .style("font-weight", "700");
+
+    function makeWavePath(data, center) {
+
+        return d3.line()
+            .x(d => x(d.t))
+            .y(d => center + amplitude * d.y)
+            (data);
+    }
+
+    function gaussianRandom() {
+        let u = 0, v = 0;
+
+        while (u === 0) u = Math.random();
+        while (v === 0) v = Math.random();
+
+        return Math.sqrt(-2 * Math.log(u)) *
+            Math.cos(2 * Math.PI * v);
+    }
+
+    function fftLowPass(signal, cutoffHz, fs, sharpness) {
+
+        const N = signal.length;
+        const fft = new fftJs(N);
+
+        const input = fft.createComplexArray();
+
+        for (let i = 0; i < N; i++) {
+            input[2 * i] = signal[i];
+            input[2 * i + 1] = 0;
+        }
+
+        const spectrum = fft.createComplexArray();
+        fft.transform(spectrum, input);
+
+
+        for (let i = 0; i < N; i++) {
+
+            let freq;
+
+            if (i <= N / 2) {
+                freq = i * fs / N;
+            } else {
+                freq = (i - N) * fs / N;
+            }
+
+            const x = Math.abs(freq) / cutoffHz;
+
+            const gain = Math.exp(-Math.pow(x, sharpness));
+
+
+            spectrum[2 * i] *= gain;
+            spectrum[2 * i + 1] *= gain;
+        }
+
+
+        const filteredComplex = fft.createComplexArray();
+        fft.inverseTransform(filteredComplex, spectrum);
+
+
+        const filtered = new Array(N);
+
+        for (let i = 0; i < N; i++) {
+            filtered[i] = filteredComplex[2 * i];
+        }
+
+        return filtered;
+    }
+
+    function sigmoid(x) {
+        return 1 / (1 + Math.exp(-x));
+    }
+
+    function fftBandPass(signal, freqCenter, bandWidth, fs, sharpness) {
+
+        const N = signal.length;
+        const fft = new fftJs(N);
+
+        const input = fft.createComplexArray();
+
+        for (let i = 0; i < N; i++) {
+            input[2 * i] = signal[i];
+            input[2 * i + 1] = 0;
+        }
+
+        const spectrum = fft.createComplexArray();
+        fft.transform(spectrum, input);
+
+
+        for (let i = 0; i < N; i++) {
+
+            let freq;
+
+            if (i <= N / 2) {
+                freq = i * fs / N;
+            } else {
+                freq = (i - N) * fs / N;
+            }
+
+
+            const absFreq = Math.abs(freq);
+
+
+            const x = Math.abs(absFreq - freqCenter) / bandWidth;
+
+            const gain = Math.exp(-0.5 * Math.pow(x, sharpness));
+
+
+            spectrum[2 * i] *= gain;
+            spectrum[2 * i + 1] *= gain;
+        }
+
+
+        const filteredComplex = fft.createComplexArray();
+        fft.inverseTransform(filteredComplex, spectrum);
+
+
+        const filtered = new Array(N);
+
+        for (let i = 0; i < N; i++) {
+            filtered[i] = filteredComplex[2 * i];
+        }
+
+        return filtered;
+    }
+
+    const fft = new fftJs(N);
+    function updateDemod() {
+        const freqDev = Number(document.getElementById("freqdev-demod").value);
+        const noiseLevel = Number(document.getElementById("noise").value);
+        const interferenceLevel = Number(document.getElementById("interference").value);
+        const interferenceFreq = Number(document.getElementById("interference-freq").value);
+        const freqDevMax = Number(document.getElementById("freqdev-demod").max);
+        const useFilter = document.getElementById("filter-toggle").checked;
+        const useBandFilter = document.getElementById("filter-band-toggle").checked;
+
+        document.getElementById("freqdev-value-demod").textContent = freqDev;
+        document.getElementById("noise-value").textContent = noiseLevel;
+        document.getElementById("interference-value").textContent = interferenceLevel;
+        document.getElementById("interference-freq-value").textContent = interferenceFreq;
+        document.getElementById("filter-value").textContent = useFilter ? "On" : "Off";
+        document.getElementById("filter-band-value").textContent = useBandFilter ? "On" : "Off";
+
+        const fm = [];
+        const fmInterference = [];
+        let integral = 0;
+        let integralInterference = 0;
+
+        for (let i = 0; i < t.length; i++) {
+            integral += message[i] / fs;
+            integralInterference += messageInterference[i] / fs;
+            const clean = Math.cos(
+                2 * Math.PI * carrierFreq * t[i] +
+                2 * Math.PI * freqDev * integral
+            )
+            const noise = noiseLevel * gaussianRandom();
+            const interference = interferenceLevel * Math.cos(2 * Math.PI * interferenceFreq * t[i] + 2 * Math.PI * freqDev * integralInterference);
+            fm.push(
+                clean + noise + interference
+            );
+        }
+
+        const filterBandwidth = 2 * (freqDev + 30);
+
+        const filteredFM = useBandFilter
+            ? fftBandPass(fm, 200, filterBandwidth, fs, 10)
+            : fm;
+
+        if (useBandFilter) {
+            fmdNoisyPath.attr("d",
+                makeWavePath(
+                    t.map((time, i) => ({ t: time, y: -fm[i] })),
+                    bandsd.fm
+                )
+            );
+        } else {
+            fmdNoisyPath.attr("d", "");
+        }
+
+        fmdPath.attr("d",
+            makeWavePath(
+                t.map((time, i) => ({ t: time, y: -filteredFM[i] })),
+                bandsd.fm
+            )
+        );
+
+        const inputComplex = fft.createComplexArray();
+
+        for (let i = 0; i < N; i++) {
+            inputComplex[2 * i] = filteredFM[i];
+            inputComplex[2 * i + 1] = 0;
+        }
+
+        const spectrum = fft.createComplexArray();
+        fft.transform(spectrum, inputComplex);
+
+        for (let i = 1; i < N / 2; i++) {
+            spectrum[2 * i] *= 2;
+            spectrum[2 * i + 1] *= 2;
+        }
+        for (let i = N / 2 + 1; i < N; i++) {
+            spectrum[2 * i] = 0;
+            spectrum[2 * i + 1] = 0;
+        }
+
+        const analyticSignal = fft.createComplexArray();
+        fft.inverseTransform(analyticSignal, spectrum);
+
+        const phaseArray = new Array(N);
+        const hilbertImg = new Array(N);
+
+        for (let i = 0; i < N; i++) {
+            const re = analyticSignal[2 * i] / N;
+            const im = analyticSignal[2 * i + 1] / N;
+
+            hilbertImg[i] = im;
+            phaseArray[i] = Math.atan2(im, re);
+        }
+
+        const maxhilbertImg = Math.max(...hilbertImg);
+
+        // Norm maxhilbertImg so it has the amplitude
+        for (let i = 0; i < N; i++) {
+            hilbertImg[i] = hilbertImg[i] / maxhilbertImg;
+        }
+
+        const unwrappedPhase = new Array(N);
+        unwrappedPhase[0] = phaseArray[0];
+
+        for (let i = 1; i < N; i++) {
+            let dp = phaseArray[i] - phaseArray[i - 1];
+            if (dp > Math.PI) dp -= 2 * Math.PI;
+            if (dp < -Math.PI) dp += 2 * Math.PI;
+            unwrappedPhase[i] = unwrappedPhase[i - 1] + dp;
+        }
+
+        const demod = new Array(N);
+
+        for (let i = 0; i < N; i++) {
+            let dPhase;
+
+            if (i === 0) {
+                dPhase = unwrappedPhase[1] - unwrappedPhase[0];
+            } else if (i === N - 1) {
+                dPhase = unwrappedPhase[N - 1] - unwrappedPhase[N - 2];
+            } else {
+                dPhase = (unwrappedPhase[i + 1] - unwrappedPhase[i - 1]) / 2;
+            }
+
+            const instFreq = dPhase * fs / (2 * Math.PI);
+            demod[i] = (instFreq - carrierFreq) / freqDev;
+        }
+
+        const filteredDemod = useFilter
+            ? fftLowPass(demod, 200, fs, 2)
+            : demod;
+
+        hilbertPath.attr("d",
+            makeWavePath(
+                t.map((time, i) => ({ t: time, y: -hilbertImg[i] })),
+                bandsd.hilbert
+            )
+        );
+
+        demodPath.attr("d",
+            makeWavePath(
+                t.map((time, i) => ({ t: time, y: -filteredDemod[i] })),
+                bandsd.demod
+            )
+        );
+    }
+
+    ["freqdev-demod", "noise", "interference", "filter-toggle", "interference-freq", "filter-band-toggle"].forEach(id => {
+        document.getElementById(id).addEventListener("input", updateDemod);
+        document.getElementById(id).addEventListener("change", updateDemod);
+    });
+
+    updateDemod();
+
+</script>

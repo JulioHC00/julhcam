@@ -1,0 +1,302 @@
+<div class="d3-chart">
+    <div class="control-group">
+        <label for="freqdev">
+            Frequency deviation:
+        </label>
+        <input id="freqdev" type="range" min="0" max="100" step="1" value="0">
+        <span class="value-label" id="freqdev-value">100</span> Hz
+    </div>
+    <div id="fm-plot"></div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+
+<script type="module">
+
+    const width = 900;
+    const height = 740;
+
+
+    const svg = d3.select("#fm-plot")
+        .append("svg")
+        .attr("viewBox", `0 0 ${width} ${height}`)
+        .style("height", "auto")
+        .style("display", "block");
+
+
+
+    const fs = 10000;
+    const duration = 1 / 10;
+
+    const signalFreq = 20;
+    const carrierFreq = 200;
+
+
+    const t = d3.range(0, duration, 1 / fs);
+
+
+
+    const x = d3.scaleLinear()
+        .domain([0, duration])
+        .range([120, width - 40]);
+
+
+    const bands = {
+        message: 120,
+        carrier: 300,
+        fm: 480,
+        freq: 660
+    };
+
+
+    const amplitude = 70;
+
+    function makeWavePath(data, center) {
+
+        return d3.line()
+            .x(d => x(d.t))
+            .y(d => center + amplitude * d.y)
+            (data);
+    }
+
+
+
+    const colors = {
+        message: "#EBB53D",
+        carrier: "#64748b",
+        fm: "#39909E",
+        freq: "#39909E"
+    };
+
+    Object.values(bands).forEach(y => {
+
+        svg.append("line")
+            .attr("x1", 120)
+            .attr("x2", width - 40)
+            .attr("y1", y)
+            .attr("y2", y)
+            .attr("stroke", "#ddd");
+
+    });
+
+
+
+    const bandwidthUpPath = svg.append("path")
+        .attr("fill", "none")
+        .attr("stroke", "#ddd")
+        .style("stroke-dasharray", ("3, 3"))
+
+    const bandwidthDownPath = svg.append("path")
+        .attr("fill", "none")
+        .attr("stroke", "#ddd")
+        .style("stroke-dasharray", ("3, 3"));
+
+    const carrierFreqPath = svg.append("path")
+        .attr("fill", "none")
+        .attr("stroke", "#ddd")
+        .style("stroke-dasharray", ("3, 3"));
+
+
+    const messagePath = svg.append("path")
+        .attr("fill", "none")
+        .attr("stroke", colors.message)
+        .attr("stroke-width", 3.5);
+
+
+    const carrierPath = svg.append("path")
+        .attr("fill", "none")
+        .attr("stroke", colors.carrier)
+        .attr("stroke-width", 3.5);
+
+
+    const fmPath = svg.append("path")
+        .attr("fill", "none")
+        .attr("stroke", colors.fm)
+        .attr("stroke-width", 3.5);
+
+    const freqPath = svg.append("path")
+        .attr("fill", "none")
+        .attr("stroke", colors.fm)
+        .attr("stroke-width", 3.5);
+
+
+    svg.append("text")
+        .attr("x", 0)
+        .attr("y", bands.message)
+        .text("Modulator")
+        .attr("fill", colors.message)
+        .style("font-size", "20px")
+        .style("font-weight", "700");
+
+
+    svg.append("text")
+        .attr("x", 10)
+        .attr("y", bands.carrier)
+        .text("Carrier")
+        .attr("fill", colors.carrier)
+        .style("font-size", "20px")
+        .style("font-weight", "700");
+
+
+    svg.append("text")
+        .attr("x", 10)
+        .attr("y", bands.fm)
+        .text("FM")
+        .attr("fill", colors.fm)
+        .style("font-size", "20px")
+        .style("font-weight", "700");
+
+    svg.append("text")
+        .attr("x", 10)
+        .attr("y", bands.freq)
+        .text("f(t)")
+        .attr("fill", colors.freq)
+        .style("font-size", "20px")
+        .style("font-weight", "700");
+
+
+
+
+    const message = t.map(time =>
+    (
+        Math.sin(2 * Math.PI * signalFreq * time)
+    )
+    );
+
+
+    function update() {
+
+        const freqDev =
+            Number(document.getElementById("freqdev").value);
+
+        const freqDevMax =
+            Number(document.getElementById("freqdev").max);
+
+
+        document.getElementById("freqdev-value")
+            .textContent = freqDev;
+
+
+        const carrier = t.map(time =>
+            Math.cos(2 * Math.PI * carrierFreq * time)
+        );
+
+
+
+        let integral = 0;
+
+        const fm = [];
+        const freq = []
+
+        const maxFreqAmp = 60;
+
+        for (let i = 0; i < t.length; i++) {
+
+            integral += message[i] / fs;
+
+            fm.push(
+                Math.cos(
+                    2 * Math.PI * carrierFreq * t[i]
+                    +
+                    2 * Math.PI * freqDev * integral
+                )
+            );
+            freq.push(
+                1 / freqDevMax * maxFreqAmp + freqDev * message[i] * maxFreqAmp / (carrierFreq * freqDevMax)
+            );
+        }
+
+
+
+        messagePath
+            .attr("d",
+                makeWavePath(
+                    t.map((time, i) => ({ t: time, y: -message[i] })),
+                    bands.message
+                )
+            );
+
+        carrierPath
+            .attr("d",
+                makeWavePath(
+                    t.map((time, i) => ({ t: time, y: -carrier[i] })),
+                    bands.carrier
+                )
+            );
+
+
+        fmPath
+            .attr("d",
+                makeWavePath(
+                    t.map((time, i) => ({ t: time, y: -fm[i] })),
+                    bands.fm
+                )
+            );
+
+        freqPath
+            .attr("d",
+                makeWavePath(
+                    t.map((time, i) => ({ t: time, y: -freq[i] })),
+                    bands.freq
+                )
+            );
+
+        const freqCenter = (1 / freqDevMax) * maxFreqAmp;
+        const freqDevScaled = (freqDev * maxFreqAmp) / (carrierFreq * freqDevMax);
+
+        bandwidthUpPath
+            .attr("d",
+                makeWavePath(
+                    [
+                        { t: 0, y: -(freqCenter + freqDevScaled) },
+                        { t: duration, y: -(freqCenter + freqDevScaled) }
+                    ],
+                    bands.freq
+                )
+            );
+
+        bandwidthDownPath
+            .attr("d",
+                makeWavePath(
+                    [
+                        { t: 0, y: -(freqCenter - freqDevScaled) },
+                        { t: duration, y: -(freqCenter - freqDevScaled) }
+                    ],
+                    bands.freq
+                )
+            );
+
+        carrierFreqPath
+            .attr("d",
+                makeWavePath(
+                    [
+                        { t: 0, y: -(freqCenter) },
+                        { t: duration, y: -(freqCenter) }
+                    ],
+                    bands.freq
+                )
+            );
+
+    }
+
+
+
+    [
+        "freqdev",
+    ].forEach(id => {
+
+        document
+            .getElementById(id)
+            .addEventListener("input", update);
+
+        document
+            .getElementById(id)
+            .addEventListener("change", update);
+
+    });
+
+
+    update();
+
+</script>

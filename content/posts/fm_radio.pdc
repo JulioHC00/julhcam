@@ -1,0 +1,148 @@
++++
+title = "Understanding how encoding and decoding in FM radio works"
+author = "JulHCam"
+date = "2026-07-14"
+description = "While studying for an amateur radio license exam, I wanted to understand how FM radio works. Here I walk through the maths behind encoding and decoding and implement it into Python."
+slug = "fm-encoding-decoding"
+comments = true
+tags = ["coding", "radio", "maths"]
++++
+
+One day, while listening to the radio I wondered, "how does FM radio work?". I had the intuition that you change the frequency of the carrier based on the amplitude of your encoded signal, but how does that actually work mathematically? While searching online I found a great article by Niklas Oberhuber titled "[How FM Radio Works](https://obrhubr.org/fm-radio)", which explained just that, and even simulated the operation of two radio stations and how depending on the settings used they can interfere with eachother. Wanting to learn more, I contacted Niklas and he very kindly sent me the code files he used to generate the results in that post. I've been looking through the code, reading more about the maths and I think I finally have a rough understanding of how FM radio works from a mathematical perspective. So, in this post I will explain how FM encoding and decoding works but not discussing the hardware that actually does e.g. the decoding in a handheld FM radio like the one I own. Perhaps for a future article as that's a whole different pickle with which I don't yet feel as comfortable with as with the maths!
+
+## Frequency modulation
+
+Essentially, what you want to do is to encode a signal of some sort (voice, music...) into a carrier wave such that it can be transmitted to later on be decoded and turned back into the original signal. There are then three main concepts:
+
+- Carrier wave: The wave that is modulated by the message wave.
+- Message wave: The signal that is to be encoded and sent.
+- Modulated wave: Which is the combination of the carrier wave, modulated by the message wave and is the signal that is actually transmitted.
+
+Starting from the idea that we want the frequency of the modulated wave to depend on the carrier wave frequency and on the instantaneous amplitude of the message wave we could write that
+
+$$
+\begin{equation}
+f_m(t) = f_c + k S(t)
+\end{equation}
+$$
+
+Where $f_m(t)$ is the modulated wave's instantaneous frequency (at time $t$), $f_c$ is the carrier wave frequency and $S(t)$ is the message wave amplitude at time t. $k$ controls by how much we modulate the frequency, it is the peak frequency deviation. It is related to the bandwidth of the transmitted signal through Carson's rule
+
+$$
+B \approx 2(\Delta f + f_{S_{\text{max}}})
+$$
+
+where $B$ is the bandwidth, $\Delta f$ is the peak frequency deviation (here $\Delta f = k$) and $f_{S_{\text{max}}}$ is the maximum frequency of the message wave. Now, in order to describe the modulated wave $m(t)$ we can write it as
+
+$$
+\begin{equation}
+m(t) = cos(\phi_m(t))
+\end{equation}
+$$
+
+assuming an amplitude of 1 and $\phi_m(t)$ represents the phase at time $t$. This instantaneous phase is related to the instantaneous frequency by
+
+$$
+\begin{equation}
+f_m(t) = \frac{1}{2\pi}\frac{\mathrm{d}\phi_m(t)}{\mathrm{d}t}.
+\end{equation}
+$$
+
+Or rearranging and integrating Equation 3
+
+$$
+\begin{equation}
+\phi_m(t) = 2\pi f_c t + 2\pi k \int_{\tau=0}^{\tau=t}S(\tau)\mathrm{d}\tau
+\end{equation}
+$$
+
+Notice that we integrate from the start of the signal, up to the current time. Intuitively, you can think that the current phase of the wave is a result of the cumulative action of all the instantaneous frequencies up to present, the same way the position of an accelerating car would depend on all the instantaneous speeds it's had up until now. In theory, this integral would be from $\tau=-\infty$ up to $\tau=t$ but since this signal has to start at some point in the past, we set that point to be $\tau=0$. Finally, the modulated wave becomes
+
+$$
+\begin{equation}
+m(t) = cos\left(2\pi f_c t + 2\pi k \int_{\tau=0}^{\tau=t}S(\tau)\mathrm{d}\tau\right).
+\end{equation}
+$$
+
+And that's it, if you have your signal $S(t)$ you can modulate it as a FM signal with carrier frequency $f_c$ and frequency deviation $k$ using equation 5. In the interactive plot below you can see what modulating a 200Hz carrier wave with a 20Hz simple sine wave looks like for different values of the frequency deviation.
+
+### Interactive: FM modulation
+
+With the plot below you can play around and see how the resulting FM modulated wave changes as you increase or decrease the frequency deviation. In the bottom plot you see directly how the changes in the modulated wave frequency mirror the shape of the message.
+
+{{< include-html file="d3js/fm-radio/modulate.html" >}}
+
+
+## Demodulating the signal
+
+Now that we have a modulated signal, we need to be able to reconstruct the original message that was encoded in it. This process is a bit more complex as it requires some interesting manipulations of the phase of the signal. We start with the modulated signal
+
+$$
+\begin{equation}
+m(t) = \cos(\phi_m)
+\end{equation}
+$$
+
+But remember that 
+
+$$
+\begin{equation}
+\phi_m(t) = 2\pi f_c t + 2\pi k \int_{\tau=0}^{\tau=t}S(\tau)\mathrm{d}\tau
+\end{equation}
+$$
+
+So if we could only get that phase and differentiate it then 
+
+$$
+\begin{equation}
+\frac{\mathrm{d}\phi_m(t)}{\mathrm{d}t} = 2\pi f_c + 2\pi k S(t)
+\end{equation}
+$$
+
+And we could recover our message as
+
+$$
+\begin{equation}
+ S(t) = \frac{1}{k}\left(\frac{1}{2\pi}\frac{\mathrm{d}\phi_m(t)}{\mathrm{d}t} - f_c \right)
+\end{equation}
+$$
+
+The question is then, given $m(t)$, how do you recover the phase $\phi_m(t)$? Naively we could think that a simple $\arccos(m(t))$ would give us the answer. However, this is ambiguous as $\cos(x) = \cos(-x)$ so there are more than one phases which result in the same value of the signal. Instead, we need to rely on something called the Hilbert transform.
+
+The Hilbert transform can be thought of as producing a version of the signal whose frequency components are phase shifted by 90deg. The reason why this is useful to us is because
+
+$$
+A(t) e^{i\phi_m(t)} = \text{Re}\left(e^{i\phi_m(t)}\right) + i\text{Im}\left(e^{i\phi_m(t)}\right) = m(t) + iH[m(t)]
+$$
+
+Where $A(t)$ is the envelope of the signal, although in ideal settings this is constant. In other words, if we can compute the Hilbert transform of our signal $H[m(t)]$, then we can get back the phase $\phi_m(t)$ by doing
+
+$$
+\phi_m(t) = \arctan2\left(H[m(t)],m(t)\right)
+$$
+
+However, this phase is wrapped since $\arctan2$ only returns values between $-\pi$ and $\pi$ so we need to unwrap these angles. What that means simply is that e.g. if an angle jumps from $\pi$ to $-\pi/2$ the unwrapped angle is not $-\pi/2$ but rather $3\pi/2$. It just means we keep adding up the phase as it builds up, rather than it being fixed between $-\pi$ and $\pi$. With the unwapped phase, we can differentiate it and use equation 9 to get the original message. Below you'll get another interactive plot to play around what the demodulation looks like plus what the effects of noise and interference are!
+
+
+### Interference, noise and filters
+
+Now, to be more realistic, when you receive a signal there's bound to be some noise in it. In this case, for simplicity we can assume it's just a random noise. This translates into noise in the demodulated signal and your audio will be distorted. Perhaps worse would be interference with another FM radio emission with a carrier frequency too close to the one of your message. Niklas' post has a great example of what that can do to an audio signal and nice plots that show how this overlap looks like in the frequency domain. Even if the two emissions are well separated from eachother, we need a way to select which one we want to demodulate, otherwise the FM signal that's input into the Hilbert transform is a mix of the two and the result is a mess (try in the figure below to set the interference to higher than 1 and don't activate the band-pass filter).
+
+If the two emissions are well separated, then you can use what's known as a bandpass filter which essentially removes all frequencies that are outside a defined range. So, e.g. a filter with central frequency of 250Hz and bandwidth of 100Hz will start to filter out frequencies outside the 200-300Hz range. So, if you tune (remember the little scrolling wheel on handheld radios?) the radio to your frequency and know the bandwidth of the emission (which for real FM emissions is known) you can filter out other stations by using such a filter. Of course, this only works if the stations are well separated. Otherwise, in order to filter the other station you'd have to filter part of the signal you want to listen to!
+
+Even with this, you can still end up with noise in the recovered audio signal. One way to get rid of some of the noise is to use a low pass filter. Since humans have a hearing range from about 20Hz to 20kHz, we can safely cut out any frequencies above the 20kHz or the highest expected frequency in the message signal using a low pass filter, which only allows frequencies under a certain value to pass through. In the interactive plot below you can see what the two types of filters look like for different values of center frequency, bandwidth and "sharpness" which controls how strict the filter is (i.e. how quickly does it drop frequencies outside the defined range).
+
+#### Interactive: Bandpass and lowpass filters
+Have a look at what bandpass and lowpass filters do to frequencies! You can change the center frequency, the bandwidth and the sharpness in the plot below as well as the type of filter.
+
+{{< include-html file="d3js/fm-radio/filters.html" >}}
+
+#### Interactive: Putting it all together
+Now you can see what all of this looks like by demodulating an FM signal. In the plot below, we modulate a signal (grey line on the "Demodulated" plot) with a carrier frequency of 250Hz and show what the FM signal looks like. You can then see what the Hilbert transform looks like and finally the demodulated signal. 
+
+But! To make it more fun, there's the option to add independent noise with the noise slider and interference from another station (change the intensity using the "Interference" slider) at a frequency given by the "Interference Freq" slider. You'll see how changing these affects the demodulated signal.
+
+Then use the checkboxes to activate a bandpass filter that's applied after the FM signal is received to filter out signals from other stations (although you'll see how it struggles when the interference is too close to our carrier at 250Hz) and a lowpass filter that's applied to the audio signal after it's been demodulated.
+
+**Have fun and be curious!**
+{{< include-html file="d3js/fm-radio/demodulate.html" >}}

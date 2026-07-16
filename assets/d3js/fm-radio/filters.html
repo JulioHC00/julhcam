@@ -1,0 +1,165 @@
+<div class="d3-chart">
+    <div id="controls">
+        <div class="control-group">
+            <label for="filterType">Filter type:</label>
+            <select name="filterType" id="filterType">
+                <option value="bandpass">Bandpass</option>
+                <option value="lowpass">Lowpass</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="freqCenter">Center Freq</label>
+            <input type="range" id="freqCenter" min="100" max="400" value="250">
+            <span class="value-label" id="freqCenterVal">250</span> Hz
+        </div>
+        <div class="control-group">
+            <label for="bandWidth">Bandwidth:</label>
+            <input type="range" id="bandWidth" min="1" max="200" value="50" disabled="false">
+            <span class="value-label" id="bandWidthVal">50</span> Hz
+        </div>
+        <div class="control-group">
+            <label for="sharpness">Sharpness:</label>
+            <input type="range" id="sharpness" min="2" max="20" step="0.1" value="10">
+            <span class="value-label" id="sharpnessVal">2.0</span>
+        </div>
+    </div>
+
+    <div id="filters-plot"></div>
+
+    <script>
+        const fs = 1000;
+        const N = 1000;
+        const maxFreq = fs / 2;
+
+        function calculateFilterResponse(freqCenter, bandWidth, sharpness) {
+            const data = [];
+            for (let i = 0; i <= N / 2; i++) {
+                const freq = i * fs / N;
+                const x = Math.abs(freq - freqCenter) / bandWidth;
+                const gain = Math.exp(-0.5 * Math.pow(x, sharpness));
+                data.push({ freq: freq, gain: gain });
+            }
+            return data;
+        }
+
+        function calculateFilterResponseLowPass(freqCenter, sharpness) {
+            const data = [];
+            for (let i = 0; i <= N / 2; i++) {
+                const freq = i * fs / N;
+                const x = Math.abs(freq) / freqCenter;
+                const gain = Math.exp(-Math.pow(x, sharpness));
+                data.push({ freq: freq, gain: gain });
+            }
+            return data;
+        }
+
+        const width = 800;
+        const height = 400;
+        const margin = { top: 20, right: 30, bottom: 50, left: 60 };
+
+        const innerWidth = width - margin.left - margin.right;
+        const innerHeight = height - margin.top - margin.bottom;
+
+        const svg = d3.select("#filters-plot")
+            .append("svg")
+            .attr("viewBox", `0 0 ${width} ${height}`)
+            .style("width", "100%")
+            .style("height", "auto")
+            .style("display", "block");
+
+        const chartGroup = svg.append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleLinear()
+            .domain([0, maxFreq])
+            .range([0, innerWidth]);
+
+        const y = d3.scaleLinear()
+            .domain([0, 1.05])
+            .range([innerHeight, 0]);
+
+        chartGroup.append("g")
+            .attr("transform", `translate(0,${innerHeight})`)
+            .call(d3.axisBottom(x));
+
+        chartGroup.append("g")
+            .call(d3.axisLeft(y));
+
+        chartGroup.append("text")
+            .attr("class", "axis-label")
+            .attr("text-anchor", "middle")
+            .attr("x", innerWidth / 2)
+            .attr("y", innerHeight + 40)
+            .text("Frequency (Hz)");
+
+
+        chartGroup.append("text")
+            .attr("class", "axis-label")
+            .attr("text-anchor", "middle")
+            .attr("transform", "rotate(-90)")
+            .attr("x", -innerHeight / 2)
+            .attr("y", -40)
+            .text("Gain (0 to 1)");
+
+        const line = d3.line()
+            .x(d => x(d.freq))
+            .y(d => y(d.gain));
+
+        const area = d3.area()
+            .x(d => x(d.freq))
+            .y0(y(0))
+            .y1(d => y(d.gain));
+
+        const areaPath = chartGroup.append("path").attr("class", "area-blue");
+        const linePath = chartGroup.append("path").attr("class", "line-blue");
+
+        let currentType = document.getElementById("filterType").value;
+
+        function updatePlot() {
+            const freqCenter = parseFloat(document.getElementById("freqCenter").value);
+            const bandWidth = parseFloat(document.getElementById("bandWidth").value) / 2;
+            const sharpness = parseFloat(document.getElementById("sharpness").value);
+            const filterType = document.getElementById("filterType").value;
+
+            document.getElementById("freqCenterVal").innerText = freqCenter;
+            document.getElementById("bandWidthVal").innerText = bandWidth;
+            document.getElementById("sharpnessVal").innerText = sharpness.toFixed(1);
+
+            let data = null;
+            if (filterType == "lowpass") {
+                document.getElementById("bandWidth").disabled = true;
+                data = calculateFilterResponseLowPass(freqCenter, sharpness);
+            } else {
+                document.getElementById("bandWidth").disabled = false;
+                data = calculateFilterResponse(freqCenter, bandWidth, sharpness);
+            }
+
+            if (currentType != filterType) {
+
+                areaPath.datum(data)
+                    .transition()
+                    .duration(1000)
+                    .attr("d", area);
+
+                linePath.datum(data)
+                    .transition()
+                    .duration(1000)
+                    .attr("d", line);
+
+            } else {
+
+                areaPath.datum(data)
+                    .attr("d", area);
+
+                linePath.datum(data)
+                    .attr("d", line);
+            }
+
+            currentType = filterType;
+        }
+
+        d3.selectAll("input[type=range]").on("input", updatePlot);
+        d3.selectAll("select").on("change", updatePlot);
+        updatePlot();
+    </script>
+</div>
